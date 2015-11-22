@@ -1,0 +1,87 @@
+## Practical Machine Learning - Project
+### Beth Fioretta - November 22, 2015
+
+## Executive Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+The goal of this project is to predict the manner in which each participant did the exercise. This is the "classe" variable in the training set. The 5 methods are:
+A: Exactly according to the specification
+B: Throwing the elbows to the front
+C: Lifting the dumbbell only halfway
+D: Lowering the dumbbell only halfway
+E: Throwing the hips to the front
+
+## Load Libraries and Create Datasets
+```{r LoadLibraries}
+rm(list = ls(all = TRUE))
+library(caret)
+library(randomForest)
+
+trainingRaw <- read.csv(file="pml-training.csv", header=TRUE, as.is = TRUE, stringsAsFactors = FALSE, sep=',', na.strings=c('NA','','#DIV/0!'))
+testingRaw <- read.csv(file="pml-testing.csv", header=TRUE, as.is = TRUE, stringsAsFactors = FALSE, sep=',', na.strings=c('NA','','#DIV/0!'))
+
+trainingRaw$classe <- as.factor(trainingRaw$classe)
+```
+## Data Analysis
+```{r DataAnalysis}
+str(trainingRaw)
+```
+
+The data contains NA and empty values which we want to remove.  We also only want to keep the belt, forearm, arm and dumbbell accelerometers.
+
+## Data Cleansing
+```{r DataCleansing}
+NAindex <- apply(trainingRaw,2,function(x) {sum(is.na(x))}) 
+trainingRaw <- trainingRaw[,which(NAindex == 0)]
+NAindex <- apply(testingRaw,2,function(x) {sum(is.na(x))}) 
+testingRaw <- testingRaw[,which(NAindex == 0)]
+```
+## Preprocessing of variables
+```{r PreProcessing}
+v <- which(lapply(trainingRaw, class) %in% "numeric")
+preObj <-preProcess(trainingRaw[,v],method=c('knnImpute', 'center', 'scale'))
+trainLess1 <- predict(preObj, trainingRaw[,v])
+trainLess1$classe <- trainingRaw$classe
+
+testLess1 <-predict(preObj,testingRaw[,v])
+```
+## Removing the non zero variables
+Remove variables with values near zero which are not relevant to the predictions
+```{r RemoveZeroes}
+nzv <- nearZeroVar(trainLess1,saveMetrics=TRUE)
+trainLess1 <- trainLess1[,nzv$nzv==FALSE]
+
+nzv <- nearZeroVar(testLess1,saveMetrics=TRUE)
+testLess1 <- testLess1[,nzv$nzv==FALSE]
+```
+## Create Cross Validation set
+Dive the training set into two parts, one for training and one for cross validation
+```{r CrossValidation}
+set.seed(7839243)
+
+inTrain = createDataPartition(trainLess1$classe, p = 3/4, list=FALSE)
+training = trainLess1[inTrain,]
+crossValidation = trainLess1[-inTrain,]
+```
+## Train the model
+Use Random Forest to train the model given its high accuracy rate.  The model is built on a training set of 28 variables from the original 160.  Cross validation is used as the training control method
+```{r RandomForest}
+startTime <- Sys.time();
+
+modFit <- train(classe ~., method="rf", data=training, trControl=trainControl(method='cv'), number=5, allowParallel=TRUE )
+
+endTime <- Sys.time()
+endTime - startTime
+```
+
+##Accuracy on training set and Cross Validation set
+Following the computation on the accuracy of training and cross validation set
+Training set:
+```{r TrainingSet}
+trainingPred <- predict(modFit, training)
+confusionMatrix(trainingPred, training$classe)
+```
+```{r crossValidationSet}
+trainingPred <- predict(modFit, training)
+confusionMatrix(trainingPred, training$classe)
+```
