@@ -82,6 +82,12 @@ trainingPred <- predict(modFit, training)
 confusionMatrix(trainingPred, training$classe)
 ```
 ```{r crossValidationSet}
-trainingPred <- predict(modFit, training)
-confusionMatrix(trainingPred, training$classe)
+cvPred <- predict(modFit, crossValidation)
+confusionMatrix(cvPred, crossValidation$classe)
+```
+## Results
+Predictions on the real testing set
+```{r Results}
+testingPred <- predict(modFit, testLess1)
+testingPred
 ```
